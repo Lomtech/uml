@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PlantUML Web App</title>
+  <title>PlantUML Web App mit Speicher</title>
   <style>
     body {
       font-family: sans-serif;
@@ -63,16 +63,7 @@
 </head>
 <body>
   <div id="input-container">
-    <textarea id="umlInput">@startuml
-class Person {
-  -groesse
-  +laufen()
-}
-class Partner {
-  +liebhaben()
-}
-Person --> Partner : ist befreundet mit
-@enduml</textarea>
+    <textarea id="umlInput"></textarea>
     <div id="buttons">
       <button onclick="downloadSVG()">SVG herunterladen</button>
       <button onclick="downloadPNG()">PNG herunterladen</button>
@@ -85,12 +76,35 @@ Person --> Partner : ist befreundet mit
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
   <script>
+    const STORAGE_KEY = "plantumlLastInput";
+
     let debounceTimer;
     const input = document.getElementById("umlInput");
+
+    // Default Text, falls nichts gespeichert ist
+    const defaultText = `@startuml
+class Person {
+  -groesse
+  +laufen()
+}
+class Partner {
+  +liebhaben()
+}
+Person --> Partner : ist befreundet mit
+@enduml`;
+
+    // Beim Laden: aus localStorage laden oder Default
+    window.onload = () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      input.value = saved || defaultText;
+      renderUML();
+    };
 
     input.addEventListener("input", () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
+        // Speichern beim Tippen
+        localStorage.setItem(STORAGE_KEY, input.value);
         renderUML();
       }, 500);
     });
@@ -169,9 +183,6 @@ Person --> Partner : ist befreundet mit
       };
       img.src = url;
     }
-
-    // Direkt beim Laden rendern:
-    renderUML();
   </script>
 </body>
 </html>
