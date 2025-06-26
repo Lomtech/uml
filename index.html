@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PlantUML Web App</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0; padding: 0;
+      height: 100vh;
+      display: flex;
+      background: #f5f5f5;
+    }
+
+    #input-container {
+      width: 40%;
+      padding: 20px;
+      box-sizing: border-box;
+      border-right: 1px solid #ccc;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #umlInput {
+      flex-grow: 1;
+      width: 100%;
+      font-family: monospace;
+      font-size: 14px;
+      resize: none;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    #buttons {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #output {
+      width: 60%;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow: auto;
+      background: white;
+    }
+
+    #output svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="input-container">
+    <textarea id="umlInput">@startuml
+class Person {
+  -groesse
+  +laufen()
+}
+class Partner {
+  +liebhaben()
+}
+Person --> Partner : ist befreundet mit
+@enduml</textarea>
+    <div id="buttons">
+      <button onclick="downloadSVG()">SVG herunterladen</button>
+      <button onclick="downloadPNG()">PNG herunterladen</button>
+    </div>
+  </div>
+
+  <div id="output">
+    <p><em>Diagramm wird hier angezeigt...</em></p>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+  <script>
+    let debounceTimer;
+    const input = document.getElementById("umlInput");
+
+    input.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        renderUML();
+      }, 500);
+    });
+
+    async function renderUML() {
+      const umlCode = input.value;
+      const encoded = await encodePlantUML(umlCode);
+      const url = `https://kroki.io/plantuml/svg/${encoded}`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Fehler beim Laden des Diagramms.");
+        const svgText = await res.text();
+        document.getElementById("output").innerHTML = svgText;
+      } catch (err) {
+        document.getElementById("output").innerText = err.message;
+      }
+    }
+
+    async function encodePlantUML(uml) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(uml);
+      const compressed = await window.pako.deflate(data, { level: 9 });
+      return encode64(compressed);
+    }
+
+    function encode64(data) {
+      const base64 = btoa(String.fromCharCode(...data));
+      return base64
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    function downloadSVG() {
+      const svg = document.querySelector("#output svg");
+      if (!svg) return alert("Kein Diagramm zum Exportieren.");
+
+      const serializer = new XMLSerializer();
+      const svgBlob = new Blob([serializer.serializeToString(svg)], { type: "image/svg+xml" });
+
+      const url = URL.createObjectURL(svgBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "diagram.svg";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadPNG() {
+      const svg = document.querySelector("#output svg");
+      if (!svg) return alert("Kein Diagramm zum Exportieren.");
+
+      const serializer = new XMLSerializer();
+      const svgData = serializer.serializeToString(svg);
+      const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+
+        const ctx = canvas.getContext("2d");
+        ctx.scale(2, 2);
+        ctx.drawImage(img, 0, 0);
+
+        canvas.toBlob((blob) => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "diagram.png";
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }, "image/png");
+      };
+      img.src = url;
+    }
+
+    // Direkt beim Laden rendern:
+    renderUML();
+  </script>
+</body>
+</html>
